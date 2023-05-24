@@ -207,7 +207,7 @@ class Point {
 
   AffinePoint toAffine() {
     // Convert point to 2d xy affine point.
-    if (equals(I)) {
+    if (equals(ZERO)) {
       // fast-path for zero point
       return AffinePoint(BigNumber.ZERO, BigNumber.ZERO);
     }
