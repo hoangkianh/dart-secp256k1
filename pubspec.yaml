@@ -8,6 +8,7 @@ environment:
   sdk: ">=2.18.2 <3.0.0"
 
 dependencies:
+  convert: ^3.1.1
   dart_bignumber:
     git: https://github.com/hoangkianh/dart-bignumber.git
 

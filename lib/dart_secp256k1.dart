@@ -30,8 +30,8 @@ BigNumber crv(BigNumber x) {
   return mod(mod(x.mul(x)).mul(x).add(BigNumber.from(CURVE['b'])));
 } // x³ + ax + b weierstrass formula; a=0
 
-Exception err([String m = '']) => throw Exception(m); // error helper, messes-up stack trace
-bool bignumber(dynamic n) => n is BigNumber; // is bignumber
+Exception err([String m = '']) =>
+    throw Exception(m); // error helper, messes-up stack trace
 bool str(dynamic s) => s is String; // is string
 bool fe(BigNumber n) =>
     n.gt(BigNumber.ZERO) && n.lt(P); // is field element (invertible)
@@ -188,23 +188,6 @@ class Point {
         : err('Point is not on curve'); // Verify the result
   }
 
-  dynamic assertValidity() {
-    // Checks if the point is valid and on-curve
-    var affPoint = aff(); // convert to 2d xy affine point.
-    if (affPoint is! AffinePoint || !fe(affPoint.x) || !fe(affPoint.y)) {
-      err('Point invalid: x or y');
-    } // x and y must be in range 0 < n < P
-    return mod(affPoint.y.mul(affPoint.y)) == crv(affPoint.x)
-        ? // y² = x³ + ax + b, must be equal
-        this
-        : err('Point invalid: not on curve');
-  }
-
-  // // multiply(n: bigint) { return this.mul(n); }           // Aliases to compress code
-  dynamic ok() {
-    return assertValidity();
-  }
-
   AffinePoint toAffine() {
     // Convert point to 2d xy affine point.
     if (equals(ZERO)) {
@@ -221,6 +204,37 @@ class Point {
       err('invalid inverse');
     }
     return AffinePoint(mod(px.mul(iz)), py.mul(iz)); // x = x*z^-1; y = y*z^-1
+  }
+
+  dynamic toHex(bool isCompressed) {
+    // Encode point to hex string.
+    var affPoint = aff(); // convert to 2d xy affine point
+    if (affPoint is AffinePoint) {
+      String head = isCompressed
+          ? ((affPoint.y.and(BigNumber.ONE)).eq(BigNumber.ZERO) ? '02' : '03')
+          : '04'; // 0x02, 0x03, 0x04 prefix
+
+      String xHex = affPoint.x.toHexString().substring(2);
+      String yHex = affPoint.y.toHexString().substring(2);
+      return '$head$xHex${isCompressed ? '' : yHex}';
+    }
+  }
+
+  dynamic assertValidity() {
+    // Checks if the point is valid and on-curve
+    var affPoint = aff(); // convert to 2d xy affine point.
+    if (affPoint is! AffinePoint || !fe(affPoint.x) || !fe(affPoint.y)) {
+      err('Point invalid: x or y');
+    } // x and y must be in range 0 < n < P
+    return mod(affPoint.y.mul(affPoint.y)) == crv(affPoint.x)
+        ? // y² = x³ + ax + b, must be equal
+        this
+        : err('Point invalid: not on curve');
+  }
+
+  // multiply(n: bigint) { return this.mul(n); }           // Aliases to compress code
+  dynamic ok() {
+    return assertValidity();
   }
 
   aff() {
