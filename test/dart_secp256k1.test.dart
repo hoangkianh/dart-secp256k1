@@ -42,14 +42,14 @@ void main() {
         }
       });
 
-      // should('#toHex() roundtrip (failed case)', () => {
-      //   const point1 =
-      //     Point.fromPrivateKey(
-      //       88572218780422190464634044548753414301110513745532121983949500266768436236425n
-      //     );
-      //   // const hex = point1.toHex(true);
-      //   // deepStrictEqual(Point.fromHex(hex).toHex(true), hex);
-      // });
+      test('#toHex() roundtrip (failed case)', () {
+        // var point1 =
+        //   Point.fromPrivateKey(
+        //     88572218780422190464634044548753414301110513745532121983949500266768436236425n
+        //   );
+        // const hex = point1.toHex(true);
+        // deepStrictEqual(Point.fromHex(hex).toHex(true), hex);
+      });
 
       // should('#toHex() roundtrip', () => {
       //   fc.assert(
