@@ -9,7 +9,50 @@ void main() {
   var points = jsonDecode(str);
 
   group('SECP256K1', () {
-    test('getPublicKey()', () {});
+  //   should('getPublicKey()', () => {
+  //   const data = privatesTxt
+  //     .split('\n')
+  //     .filter((line) => line)
+  //     .map((line) => line.split(':'));
+  //   for (let [priv, x, y] of data) {
+  //     const point = Point.fromPrivateKey(BigInt(priv));
+  //     deepStrictEqual(toBEHex(point.x), x);
+  //     deepStrictEqual(toBEHex(point.y), y);
+
+  //     const point2 = Point.fromHex(secp.getPublicKey(toBEHex(BigInt(priv))));
+  //     deepStrictEqual(toBEHex(point2.x), x);
+  //     deepStrictEqual(toBEHex(point2.y), y);
+
+  //     const point3 = Point.fromHex(secp.getPublicKey(hexToBytes(toBEHex(BigInt(priv)))));
+  //     deepStrictEqual(toBEHex(point3.x), x);
+  //     deepStrictEqual(toBEHex(point3.y), y);
+  //   }
+  // });
+  // should('getPublicKey() rejects invalid keys', () => {
+  //   for (const item of INVALID_ITEMS) {
+  //     throws(() => secp.getPublicKey(item));
+  //   }
+  // });
+  // should('precompute', () => {
+  //   secp.utils.precompute(4);
+  //   const data = privatesTxt
+  //     .split('\n')
+  //     .filter((line) => line)
+  //     .map((line) => line.split(':'));
+  //   for (let [priv, x, y] of data) {
+  //     const point = Point.fromPrivateKey(BigInt(priv));
+  //     deepStrictEqual(toBEHex(point.x), x);
+  //     deepStrictEqual(toBEHex(point.y), y);
+
+  //     const point2 = Point.fromHex(secp.getPublicKey(toBEHex(BigInt(priv))));
+  //     deepStrictEqual(toBEHex(point2.x), x);
+  //     deepStrictEqual(toBEHex(point2.y), y);
+
+  //     const point3 = Point.fromHex(secp.getPublicKey(hexToBytes(toBEHex(BigInt(priv)))));
+  //     deepStrictEqual(toBEHex(point3.x), x);
+  //     deepStrictEqual(toBEHex(point3.y), y);
+  //   }
+  // });
 
     group('Point', () {
       test('fromHex() assertValidity', () async {
@@ -24,13 +67,12 @@ void main() {
         }
       });
 
-      // should('.fromPrivateKey()', () => {
-      //   for (const vector of points.valid.pointFromScalar) {
-      //     const { d, expected } = vector;
-      //     let p = Point.fromPrivateKey(d);
-      //     deepStrictEqual(p.toHex(true), expected);
-      //   }
-      // });
+      test('.fromPrivateKey()', () {
+        for (var vector in points['valid']['pointFromScalar']) {
+          var p = Point.fromPrivateKey(vector['d']);
+          expect(p.toHex(true), vector['expected']);
+        }
+      });
 
       test('#toHex(compressed)', () {
         for (var vector in points['valid']['pointCompress']) {
@@ -43,12 +85,12 @@ void main() {
       });
 
       test('#toHex() roundtrip (failed case)', () {
-        // var point1 =
-        //   Point.fromPrivateKey(
-        //     88572218780422190464634044548753414301110513745532121983949500266768436236425n
-        //   );
-        // const hex = point1.toHex(true);
-        // deepStrictEqual(Point.fromHex(hex).toHex(true), hex);
+        var point1 =
+          Point.fromPrivateKey(
+            '0xC3D2196ACDC1DB254EC4D80D6158CDC24529A9D6629A29B1578A66C088A71089'.toLowerCase()
+          );
+        var hex = point1.toHex(true);
+        expect(Point.fromHex(hex).toHex(true), hex);
       });
 
       // should('#toHex() roundtrip', () => {

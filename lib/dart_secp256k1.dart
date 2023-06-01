@@ -28,7 +28,6 @@ final Map<String, BigNumber> CURVE = {
 const int fLen = 32; // field / group byte length
 
 BigNumber crv(BigNumber x) {
-  // print('x: $x');
   return mod(mod(x * x) * x + BigNumber.from(CURVE['b']));
 } // x³ + ax + b weierstrass formula; a=0
 
@@ -37,7 +36,7 @@ Exception err([String m = '']) =>
 bool str(dynamic s) => s is String; // is string
 bool fe(BigNumber n) =>
     n > BigNumber.ZERO && n < P; // is field element (invertible)
-bool ge(BigNumber n) => n < BigNumber.ZERO && n < N; // is group element
+bool ge(BigNumber n) => n > BigNumber.ZERO && n < N; // is group element
 dynamic au8(dynamic a, [num? l]) => // is Uint8List (of specific length)
     a is! Uint8List || (l != null && l > 0 && a.length != l)
         ? err('Uint8Array expected')
@@ -67,7 +66,7 @@ dynamic inv(BigNumber n, [BigNumber? md]) {
   if (md != null) {
     md1 = md;
   }
-  if (n.eq(BigNumber.ZERO) || md1.lt(BigNumber.ZERO)) {
+  if (n.isZero() || md1 <= BigNumber.ZERO) {
     err('no inverse n=$n mod=$md1');
   } // no neg exponent for now
   var a = mod(n, md1);
@@ -77,12 +76,11 @@ dynamic inv(BigNumber n, [BigNumber? md]) {
   var u = BigNumber.ONE;
   var v = BigNumber.ZERO;
 
-  while (a.eq(BigNumber.ZERO)) {
+  while (!a.isZero()) {
     // uses euclidean gcd algorithm
-    var q = b.mul(a); // not constant-time
-    var r = b.mod(a);
-    var m = x.sub(u.mul(q));
-    var n = y.sub(v.mul(q));
+    var q = b / a, r = b % a; // not constant-time
+    var m = x - u * q;
+    var n = y - v * q;
 
     b = a;
     a = r;
@@ -91,7 +89,7 @@ dynamic inv(BigNumber n, [BigNumber? md]) {
     u = m;
     v = n;
   }
-  return b.eq(BigNumber.ONE)
+  return b == BigNumber.ONE
       ? mod(x, md1)
       : err('no inverse'); // b is gcd at this point
 }
@@ -123,44 +121,68 @@ dynamic toPriv(BigNumber p) {
       : err('private key out of range'); // check if bigint is in range
 }
 
-// const W = 8;                                            // Precomputes-related code. W = window size
-// List<Point> precompute() {                              // They give 12x faster getPublicKey(),
-//   List<Point> points = List.empty(growable: true);                           // 10x sign(), 2x verify(). To achieve this,
-//   const windows = 256 / W + 1;                          // app needs to spend 40ms+ to calculate
-//   var p = G, b = p;                                     // a lot of points related to base point G.
-//   for (var w = 0; w < windows; w++) {                   // Points are stored in array and used
-//     b = p;                                              // any time Gx multiplication is done.
-//     points.add(b);                                     // They consume 16-32 MiB of RAM.
-//     for (var i = 1; i < math.pow(2, W - 1); i++) { b = b.add(p); points.add(b); }
-//     p = b.double();                                     // Precomputes don't speed-up getSharedKey,
-//   }                                                     // which multiplies user point by scalar,
-//   return points;                                        // when precomputes are using base point
-// }
-// Map<String, Point> wNAF(BigNumber n) {   // w-ary non-adjacent form (wNAF) method.
-//                                                         // Compared to other point mult methods,
-//   const comp = Gpows || (Gpows = precompute());         // stores 2x less points using subtraction
-//   const neg = (cnd: boolean, p: Point) => { let n = p.negate(); return cnd ? n : p; } // negate
-//   let p = I, f = G;                                     // f must be G, or could become I in the end
-//   const windows = 1 + 256 / W;                          // W=8 17 windows
-//   const wsize = 2 ** (W - 1);                           // W=8 128 window size
-//   const mask = BigInt(2 ** W - 1);                      // W=8 will create mask 0b11111111
-//   const maxNum = 2 ** W;                                // W=8 256
-//   const shiftBy = BigInt(W);                            // W=8 8
-//   for (let w = 0; w < windows; w++) {
-//     const off = w * wsize;
-//     let wbits = Number(n & mask);                       // extract W bits.
-//     n >>= shiftBy;                                      // shift number by W bits.
-//     if (wbits > wsize) { wbits -= maxNum; n += 1n; }    // split if bits > max: +224 => 256-32
-//     const off1 = off, off2 = off + Math.abs(wbits) - 1; // offsets, evaluate both
-//     const cnd1 = w % 2 !== 0, cnd2 = wbits < 0;         // conditions, evaluate both
-//     if (wbits === 0) {
-//       f = f.add(neg(cnd1, comp[off1]));                 // bits are 0: add garbage to fake point
-//     } else {                                            //          ^ can't add off2, off2 = I
-//       p = p.add(neg(cnd2, comp[off2]));                 // bits are 1: add to result point
-//     }
-//   }
-//   return { p, f }                                       // return both real and fake points for JIT
-// };        // !! you can disable precomputes by commenting-out call of the wNAF() inside Point#mul()
+const W = 8; // Precomputes-related code. W = window size
+List<Point> precompute() {
+  // They give 12x faster getPublicKey(),
+  List<Point> points =
+      List.empty(growable: true); // 10x sign(), 2x verify(). To achieve this,
+  const windows = 256 / W + 1; // app needs to spend 40ms+ to calculate
+  Point p = G, b = p; // a lot of points related to base point G.
+  for (var w = 0; w < windows; w++) {
+    // Points are stored in array and used
+    b = p; // any time Gx multiplication is done.
+    points.add(b); // They consume 16-32 MiB of RAM.
+    for (var i = 1; i < math.pow(2, W - 1); i++) {
+      b = b.add(p);
+      points.add(b);
+    }
+    p = b.double(); // Precomputes don't speed-up getSharedKey,
+  } // which multiplies user point by scalar,
+  return points; // when precomputes are using base point
+}
+
+List<Point> Gpows = List.empty(growable: true);
+neg(bool cnd, Point p) {
+  var n = p.negate();
+  return cnd ? n : p;
+} // negate
+
+Map<String, Point> wNAF(BigNumber n) {
+  // w-ary non-adjacent form (wNAF) method.
+  // Compared to other point mult methods,
+  if (Gpows.isEmpty) {
+    Gpows = precompute();
+  }
+  var comp = Gpows; // stores 2x less points using subtraction
+  Point p = I, f = G; // f must be G, or could become I in the end
+  const windows = 1 + 256 / W; // W=8 17 windows
+  var wsize = math.pow(2, W - 1); // W=8 128 window size
+  var mask =
+      BigNumber.from(math.pow(2, W) - 1); // W=8 will create mask 0b11111111
+  var maxNum = math.pow(2, W); // W=8 256
+  var shiftBy = BigNumber.from(W); // W=8 8
+  for (var w = 0; w < windows; w++) {
+    var off = w * wsize;
+    var wbits = (n & mask); // extract W bits.
+    n >>= int.parse(shiftBy.toString()); // shift number by W bits.
+    if (wbits.toNumber() > wsize) {
+      wbits -= BigNumber.from(maxNum);
+      n += BigNumber.ONE;
+    } // split if bits > max: +224 => 256-32
+    var off1 = int.parse(off.toString());
+    var off2 = int.parse((off + wbits.abs().toNumber() - 1)
+        .toString()); // offsets, evaluate both
+    var cnd1 = w % 2 != 0,
+        cnd2 = wbits.isNegative(); // conditions, evaluate both
+    if (wbits.isZero()) {
+      f = f.add(neg(cnd1, comp[off1])); // bits are 0: add garbage to fake point
+    } else {
+      //          ^ can't add off2, off2 = I
+      p = p.add(neg(cnd2, comp[off2])); // bits are 1: add to result point
+    }
+  }
+  return {'p': p, 'f': f}; // return both real and fake points for JIT
+} // !! you can disable precomputes by commenting-out call of the wNAF() inside Point#mul()
 
 class AffinePoint {
   BigNumber x;
@@ -200,6 +222,10 @@ class Point {
     return X1Z2 == X2Z1 && Y1Z2 == Y2Z1;
   }
 
+  negate() {
+    return Point(px, mod(py * BigNumber.NEGATIVE_ONE), pz);
+  } // Flip point over y coord
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -212,22 +238,24 @@ class Point {
   @override
   int get hashCode => _hex.hashCode;
 
-// negate() { return new Point(this.px, mod(-this.py), this.pz); } // Flip point over y coord
-//     double() { return this.add(this); } // Point doubling: P+P, complete formula.
-  add(Point other) {
-    var X1 = px, Y1 = py, Z1 = px;
+  double() {
+    return add(this);
+  } // Point doubling: P+P, complete formula.
+
+  dynamic add(Point other) {
+    var X1 = px, Y1 = py, Z1 = pz;
     var X2 = other.px, Y2 = other.py, Z2 = other.pz;
 
     var a = CURVE['a'], b = CURVE['b']; // Cost: 12M + 0S + 3*a + 3*b3 + 23add
 
     if (a == null || b == null) throw Exception('invalid a, b');
     var X3 = BigNumber.ZERO, Y3 = BigNumber.ZERO, Z3 = BigNumber.ZERO;
-    var b3 = mod(b * (BigNumber.from(3)));
-    var t0 = mod(X1 * (X2)),
-        t1 = mod(Y1 * (Y2)),
-        t2 = mod(Z1 * (Z2)),
-        t3 = mod(X1 * (Y1)); // step 1
-    var t4 = mod(X2 + (Y2)); // step 5
+    var b3 = mod(b * BigNumber.from(3));
+    var t0 = mod(X1 * X2),
+        t1 = mod(Y1 * Y2),
+        t2 = mod(Z1 * Z2),
+        t3 = mod(X1 + Y1); // step 1
+    var t4 = mod(X2 + Y2); // step 5
     t3 = mod(t3 * t4);
     t4 = mod(t0 + t1);
     t3 = mod(t3 - t4);
@@ -265,27 +293,28 @@ class Point {
     Z3 = mod(Z3 + t0); // step 40
     return Point(X3, Y3, Z3);
   }
-  // mul(BigNumber n, [bool? safe = true]) {
-  //   if ((safe == null || !safe) && n.eq(BigNumber.ZERO)) {
-  //     return ZERO; // in unsafe mode, allow zero
-  //   }
-  //   if (!ge(n)) {
-  //     err('invalid scalar'); // must be 0 < n < CURVE.n
-  //   }
-  //   if (equals(BASE)) {
-  //     return wNAF(n).p; // use precomputes for base point
-  //   }
-  //   var p = I, f = G; // init result point & fake point
-  //   for (var d = this; n.gt(BigNumber.ZERO); d = d.double(), n = n.shr(1)) {
-  //     // double-and-add ladder
-  //     if (n.and(BigNumber.ONE).gt(BigNumber.ZERO)) {
-  //       p = p.add(d); // if bit is present, add to point
-  //     } else if (safe) {
-  //       f = f.add(d); // if not, add to fake for timing safety
-  //     }
-  //   }
-  //   return p;
-  // }
+
+  mul(BigNumber n, [bool safe = true]) {
+    if (!safe && n.isZero()) {
+      return ZERO; // in unsafe mode, allow zero
+    }
+    if (!ge(n)) {
+      err('invalid scalar'); // must be 0 < n < CURVE.n
+    }
+    if (equals(BASE)) {
+      return wNAF(n)['p']; // use precomputes for base point
+    }
+    var p = I, f = G; // init result point & fake point
+    for (var d = this; n > BigNumber.ZERO; d = d.double(), n = n.shr(1)) {
+      // double-and-add ladder
+      if (n & BigNumber.ONE > BigNumber.ZERO) {
+        p = p.add(d); // if bit is present, add to point
+      } else if (safe) {
+        f = f.add(d); // if not, add to fake for timing safety
+      }
+    }
+    return p;
+  }
 
   static Point fromAffine(AffinePoint p) => Point(p.x, p.y, BigNumber.ONE);
 
@@ -321,9 +350,12 @@ class Point {
         : err('Point is not on curve'); // Verify the result
   }
 
-  // static fromPrivateKey(k) {
-  //   return BASE.mul(toPriv(k));
-  // } // Create point from a private key.
+  static fromPrivateKey(String k) {
+    if (!k.startsWith('0x')) {
+      k = '0x$k';
+    }
+    return BASE.mul(toPriv(BigNumber.from(k)));
+  } // Create point from a private key.
 
   AffinePoint toAffine() {
     // Convert point to 2d xy affine point.
@@ -336,11 +368,11 @@ class Point {
       return AffinePoint(px, py);
     }
     var iz = inv(pz); // z^-1: invert z
-    if (!mod(pz.mul(iz)).eq(BigNumber.ONE)) {
+    if (mod(pz * iz) != BigNumber.ONE) {
       // (z * z^-1) must be 1, otherwise bad math
       err('invalid inverse');
     }
-    return AffinePoint(mod(px.mul(iz)), py.mul(iz)); // x = x*z^-1; y = y*z^-1
+    return AffinePoint(mod(px * iz), mod(py * iz)); // x = x*z^-1; y = y*z^-1
   }
 
   dynamic toHex(bool isCompressed) {
@@ -348,7 +380,7 @@ class Point {
     var affPoint = aff(); // convert to 2d xy affine point
     if (affPoint is AffinePoint) {
       String head = isCompressed
-          ? ((affPoint.y.and(BigNumber.ONE)).eq(BigNumber.ZERO) ? '02' : '03')
+          ? ((affPoint.y & BigNumber.ONE).isZero() ? '02' : '03')
           : '04'; // 0x02, 0x03, 0x04 prefix
 
       String xHex = affPoint.x.toHexString().substring(2);
@@ -376,5 +408,10 @@ class Point {
 
   aff() {
     return toAffine();
+  }
+
+  @override
+  String toString() {
+    return 'Point {\n  px: $px,\n  py: $py,\n  pz: $pz\n}';
   }
 }
