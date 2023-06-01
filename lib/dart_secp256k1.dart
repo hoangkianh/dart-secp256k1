@@ -6,41 +6,23 @@ import 'package:convert/convert.dart' as convert;
 
 import 'package:dart_bignumber/dart_bignumber.dart';
 
-final BigNumber B256 = BigNumber.from(2)
-    .pow(BigNumber.from(256)); // secp256k1 is short weierstrass curve
-final BigNumber P =
-    B256 - (BigNumber.from('0x1000003d1')); // curve's field prime
-final BigNumber N = B256 -
-    (BigNumber.from(
-        '0x14551231950b75fc4402da1732fc9bebf')); // curve (group) order
-final BigNumber Gx = BigNumber.from(
-    '0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798'); // base point x
-final BigNumber Gy = BigNumber.from(
-    '0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8'); // base point y
-final Map<String, BigNumber> CURVE = {
-  'p': P,
-  'n': N,
-  'a': BigNumber.from(0),
-  'b': BigNumber.from(7),
-  'Gx': Gx,
-  'Gy': Gy
-}; // exported variables incl. a, b
+final BigNumber B256 = BigNumber.from(2).pow(BigNumber.from(256)); // secp256k1 is short weierstrass curve
+final BigNumber P = B256 - (BigNumber.from('0x1000003d1')); // curve's field prime
+final BigNumber N = B256 - (BigNumber.from('0x14551231950b75fc4402da1732fc9bebf')); // curve (group) order
+final BigNumber Gx = BigNumber.from('0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798'); // base point x
+final BigNumber Gy = BigNumber.from('0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8'); // base point y
+final Map<String, BigNumber> CURVE = {'p': P, 'n': N, 'a': BigNumber.from(0), 'b': BigNumber.from(7), 'Gx': Gx, 'Gy': Gy}; // exported variables incl. a, b
 const int fLen = 32; // field / group byte length
 
 BigNumber crv(BigNumber x) {
   return mod(mod(x * x) * x + BigNumber.from(CURVE['b']));
 } // x³ + ax + b weierstrass formula; a=0
 
-Exception err([String m = '']) =>
-    throw Exception(m); // error helper, messes-up stack trace
+Exception err([String m = '']) => throw Exception(m); // error helper, messes-up stack trace
 bool str(dynamic s) => s is String; // is string
-bool fe(BigNumber n) =>
-    n > BigNumber.ZERO && n < P; // is field element (invertible)
+bool fe(BigNumber n) => n > BigNumber.ZERO && n < P; // is field element (invertible)
 bool ge(BigNumber n) => n > BigNumber.ZERO && n < N; // is group element
-dynamic au8(dynamic a, [num? l]) => // is Uint8List (of specific length)
-    a is! Uint8List || (l != null && l > 0 && a.length != l)
-        ? err('Uint8Array expected')
-        : a;
+dynamic au8(dynamic a, [num? l]) => a is! Uint8List || (l != null && l > 0 && a.length != l) ? err('Uint8Array expected') : a; // is Uint8List (of specific length)
 
 // const u8n = (data?: any) => new Uint8Array(data);       // creates Uint8Array
 // const toU8 = (a: Hex, len?: number) => au8(str(a) ? h2b(a) : u8n(a), len); // norm(hex/u8a) to u8a
@@ -55,11 +37,8 @@ BigNumber mod(BigNumber a, [BigNumber? b]) {
   return r >= BigNumber.ZERO ? r : b1 + r;
 }
 
-// let Gpows: Point[] | undefined = undefined;             // precomputes for base point G
-BigNumber b2n(Uint8List b) =>
-    BigNumber.from('0x${convert.hex.encode(b)}'); // bytes to number
-BigNumber slcNum(Uint8List b, int from, int to) =>
-    b2n(b.sublist(from, to)); // slice bytes num
+BigNumber b2n(Uint8List b) => BigNumber.from('0x${convert.hex.encode(b)}'); // bytes to number
+BigNumber slcNum(Uint8List b, int from, int to) => b2n(b.sublist(from, to)); // slice bytes num
 dynamic inv(BigNumber n, [BigNumber? md]) {
   // modular inversion
   var md1 = P;
@@ -89,18 +68,14 @@ dynamic inv(BigNumber n, [BigNumber? md]) {
     u = m;
     v = n;
   }
-  return b == BigNumber.ONE
-      ? mod(x, md1)
-      : err('no inverse'); // b is gcd at this point
+  return b == BigNumber.ONE ? mod(x, md1) : err('no inverse'); // b is gcd at this point
 }
 
 dynamic sqrt(BigNumber n) {
   // √n = n^((p+1)/4) for fields p = 3 mod 4
   // So, a special, fast case. Paper: "Square Roots from 1;24,51,10 to Dan Shanks".
   var r = BigNumber.ONE;
-  for (var i = n, e = (P + BigNumber.ONE) / BigNumber.from(4);
-      e > BigNumber.ZERO;
-      e >>= 1) {
+  for (var i = n, e = (P + BigNumber.ONE) / BigNumber.from(4); e > BigNumber.ZERO; e >>= 1) {
     // powMod: modular exponentiation.
     if (e & BigNumber.ONE > BigNumber.ZERO) {
       r = (r * BigNumber.from(i)) % P;
@@ -116,16 +91,13 @@ dynamic sqrt(BigNumber n) {
 }
 
 dynamic toPriv(BigNumber p) {
-  return ge(p)
-      ? p
-      : err('private key out of range'); // check if bigint is in range
+  return ge(p) ? p : err('private key out of range'); // check if bigint is in range
 }
 
 const W = 8; // Precomputes-related code. W = window size
 List<Point> precompute() {
   // They give 12x faster getPublicKey(),
-  List<Point> points =
-      List.empty(growable: true); // 10x sign(), 2x verify(). To achieve this,
+  List<Point> points = List.empty(growable: true); // 10x sign(), 2x verify(). To achieve this,
   const windows = 256 / W + 1; // app needs to spend 40ms+ to calculate
   Point p = G, b = p; // a lot of points related to base point G.
   for (var w = 0; w < windows; w++) {
@@ -157,8 +129,7 @@ Map<String, Point> wNAF(BigNumber n) {
   Point p = I, f = G; // f must be G, or could become I in the end
   const windows = 1 + 256 / W; // W=8 17 windows
   var wsize = math.pow(2, W - 1); // W=8 128 window size
-  var mask =
-      BigNumber.from(math.pow(2, W) - 1); // W=8 will create mask 0b11111111
+  var mask = BigNumber.from(math.pow(2, W) - 1); // W=8 will create mask 0b11111111
   var maxNum = math.pow(2, W); // W=8 256
   var shiftBy = BigNumber.from(W); // W=8 8
   for (var w = 0; w < windows; w++) {
@@ -170,10 +141,8 @@ Map<String, Point> wNAF(BigNumber n) {
       n += BigNumber.ONE;
     } // split if bits > max: +224 => 256-32
     var off1 = int.parse(off.toString());
-    var off2 = int.parse((off + wbits.abs().toNumber() - 1)
-        .toString()); // offsets, evaluate both
-    var cnd1 = w % 2 != 0,
-        cnd2 = wbits.isNegative(); // conditions, evaluate both
+    var off2 = int.parse((off + wbits.abs().toNumber() - 1).toString()); // offsets, evaluate both
+    var cnd1 = w % 2 != 0, cnd2 = wbits.isNegative(); // conditions, evaluate both
     if (wbits.isZero()) {
       f = f.add(neg(cnd1, comp[off1])); // bits are 0: add garbage to fake point
     } else {
@@ -200,8 +169,7 @@ class Point {
   final BigNumber py;
   final BigNumber pz;
   static final BASE = Point(Gx, Gy, BigNumber.ONE); // Generator / base point
-  static final ZERO = Point(
-      BigNumber.ZERO, BigNumber.ONE, BigNumber.ZERO); // Identity / zero point
+  static final ZERO = Point(BigNumber.ZERO, BigNumber.ONE, BigNumber.ZERO); // Identity / zero point
 
   Point(this.px, this.py, this.pz); // 3d less function
 
@@ -251,10 +219,7 @@ class Point {
     if (a == null || b == null) throw Exception('invalid a, b');
     var X3 = BigNumber.ZERO, Y3 = BigNumber.ZERO, Z3 = BigNumber.ZERO;
     var b3 = mod(b * BigNumber.from(3));
-    var t0 = mod(X1 * X2),
-        t1 = mod(Y1 * Y2),
-        t2 = mod(Z1 * Z2),
-        t3 = mod(X1 + Y1); // step 1
+    var t0 = mod(X1 * X2), t1 = mod(Y1 * Y2), t2 = mod(Z1 * Z2), t3 = mod(X1 + Y1); // step 1
     var t4 = mod(X2 + Y2); // step 5
     t3 = mod(t3 * t4);
     t4 = mod(t0 + t1);
@@ -320,8 +285,7 @@ class Point {
 
   static dynamic fromHex(String hex) {
     // Convert Uint8List or hex string to Point
-    Uint8List hexBytes = Uint8List.fromList(
-        convert.hex.decode(hex)); // convert hex string to Uint8Array
+    Uint8List hexBytes = Uint8List.fromList(convert.hex.decode(hex)); // convert hex string to Uint8Array
     Point p = ZERO;
     int head = hexBytes[0];
     Uint8List tail = hexBytes.sublist(1); // first byte is prefix, rest is data
@@ -334,8 +298,7 @@ class Point {
         err('Point hex invalid: x not FE');
       } // with byte 0x02 or 0x03. Check if 0<x<P
       var y = sqrt(crv(x)); // x³ + ax + b is right side of equation
-      var isYOdd = (y & (BigNumber.ONE)) ==
-          BigNumber.ONE; // y² is equivalent left-side. Calculate y²:
+      var isYOdd = (y & (BigNumber.ONE)) == BigNumber.ONE; // y² is equivalent left-side. Calculate y²:
       var headOdd = (head & 1) == 1; // y = √y²; there are two solutions: y, -y
       if (headOdd != isYOdd) {
         y = mod(y.mul(BigNumber.NEGATIVE_ONE));
@@ -345,9 +308,7 @@ class Point {
     if (len == 65 && head == 0x04) {
       p = Point(x, slcNum(tail, fLen, 2 * fLen), BigNumber.ONE);
     }
-    return !p.equals(ZERO)
-        ? p.ok()
-        : err('Point is not on curve'); // Verify the result
+    return !p.equals(ZERO) ? p.ok() : err('Point is not on curve'); // Verify the result
   }
 
   static fromPrivateKey(String k) {
@@ -379,9 +340,7 @@ class Point {
     // Encode point to hex string.
     var affPoint = aff(); // convert to 2d xy affine point
     if (affPoint is AffinePoint) {
-      String head = isCompressed
-          ? ((affPoint.y & BigNumber.ONE).isZero() ? '02' : '03')
-          : '04'; // 0x02, 0x03, 0x04 prefix
+      String head = isCompressed ? ((affPoint.y & BigNumber.ONE).isZero() ? '02' : '03') : '04'; // 0x02, 0x03, 0x04 prefix
 
       String xHex = affPoint.x.toHexString().substring(2);
       String yHex = affPoint.y.toHexString().substring(2);
