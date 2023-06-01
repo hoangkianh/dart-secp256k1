@@ -401,6 +401,10 @@ class Point {
         : err('Point invalid: not on curve');
   }
 
+  Point multiply(BigNumber n) {
+    return mul(n);
+  }
+
   // multiply(n: bigint) { return this.mul(n); }           // Aliases to compress code
   dynamic ok() {
     return assertValidity();
