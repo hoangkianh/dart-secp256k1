@@ -1,6 +1,9 @@
+// ignore_for_file: non_constant_identifier_names
+
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
+import 'dart:math' as math;
+
 import 'package:dart_bignumber/dart_bignumber.dart';
 import 'package:dart_secp256k1/dart_secp256k1.dart';
 import 'package:test/test.dart';
@@ -10,40 +13,51 @@ void main() {
   var str = file.readAsStringSync();
   var points = jsonDecode(str);
 
-  Random _random = Random();
+  final privatesFile = File('test/vectors/privates.txt');
+  var privatesTxt = privatesFile.readAsStringSync();
+
+  String toBEHex(BigNumber n) => n.toHexString().replaceAll('0x', '').padLeft(64, '0');
+
+  math.Random random = math.Random();
   String randomHexString(int length) {
     StringBuffer sb = StringBuffer();
     for (var i = 0; i < length; i++) {
-      sb.write(_random.nextInt(16).toRadixString(16));
+      sb.write(random.nextInt(16).toRadixString(16));
     }
     return sb.toString();
   }
 
+  List<String> INVALID_ITEMS = [
+    'deadbeef',
+    math.pow(2, 53).toString(),
+    'xyzxyzxyxyzxyzxyxyzxyzxyxyzxyzxyxyzxyzxyxyzxyzxyxyzxyzxyxyzxyzxy',
+    (CURVE['n']! + BigNumber.TWO).toHexString()
+  ];
+
   group('SECP256K1', () {
-    //   should('getPublicKey()', () => {
-    //   const data = privatesTxt
-    //     .split('\n')
-    //     .filter((line) => line)
-    //     .map((line) => line.split(':'));
-    //   for (let [priv, x, y] of data) {
-    //     const point = Point.fromPrivateKey(BigInt(priv));
-    //     deepStrictEqual(toBEHex(point.x), x);
-    //     deepStrictEqual(toBEHex(point.y), y);
+    test('getPublicKey()', () {
+      var data = privatesTxt.split('\n').map((line) => line.split(':'));
+      for (var p in data) {
+        if (p.length == 3) {
+          var priv = p[0], x = p[1], y = p[2];
+          var bn = BigNumber.from(priv);
 
-    //     const point2 = Point.fromHex(secp.getPublicKey(toBEHex(BigInt(priv))));
-    //     deepStrictEqual(toBEHex(point2.x), x);
-    //     deepStrictEqual(toBEHex(point2.y), y);
+          Point point = Point.fromPrivateKey(bn.toHexString());
+          expect(toBEHex(point.x), x);
+          expect(toBEHex(point.y), y);
 
-    //     const point3 = Point.fromHex(secp.getPublicKey(hexToBytes(toBEHex(BigInt(priv)))));
-    //     deepStrictEqual(toBEHex(point3.x), x);
-    //     deepStrictEqual(toBEHex(point3.y), y);
-    //   }
-    // });
-    // should('getPublicKey() rejects invalid keys', () => {
-    //   for (const item of INVALID_ITEMS) {
-    //     throws(() => secp.getPublicKey(item));
-    //   }
-    // });
+          String publicKey2 = getPublicKey(toBEHex(bn));
+          Point point2 = Point.fromHex(publicKey2);
+          expect(toBEHex(point2.x), x);
+          expect(toBEHex(point2.y), y);
+        }
+      }
+    });
+    test('getPublicKey() rejects invalid keys', () {
+      for (var item in INVALID_ITEMS) {
+        expect(() => getPublicKey(item), throwsException);
+      }
+    });
     // should('precompute', () => {
     //   secp.utils.precompute(4);
     //   const data = privatesTxt
@@ -96,9 +110,8 @@ void main() {
       });
 
       test('#toHex() roundtrip (failed case)', () {
-        Point point1 = Point.fromPrivateKey(
-            '0xC3D2196ACDC1DB254EC4D80D6158CDC24529A9D6629A29B1578A66C088A71089'
-                .toLowerCase());
+        var bn = BigNumber.from('88572218780422190464634044548753414301110513745532121983949500266768436236425');
+        Point point1 = Point.fromPrivateKey(bn.toHexString());
         var hex = point1.toHex(true);
         expect(Point.fromHex(hex).toHex(true), hex);
       });

@@ -22,10 +22,6 @@ Exception err([String m = '']) => throw Exception(m); // error helper, messes-up
 bool str(dynamic s) => s is String; // is string
 bool fe(BigNumber n) => n > BigNumber.ZERO && n < P; // is field element (invertible)
 bool ge(BigNumber n) => n > BigNumber.ZERO && n < N; // is group element
-dynamic au8(dynamic a, [num? l]) => a is! Uint8List || (l != null && l > 0 && a.length != l) ? err('Uint8Array expected') : a; // is Uint8List (of specific length)
-
-// const u8n = (data?: any) => new Uint8Array(data);       // creates Uint8Array
-// const toU8 = (a: Hex, len?: number) => au8(str(a) ? h2b(a) : u8n(a), len); // norm(hex/u8a) to u8a
 BigNumber mod(BigNumber a, [BigNumber? b]) {
   // mod division
   var b1 = P;
@@ -37,9 +33,19 @@ BigNumber mod(BigNumber a, [BigNumber? b]) {
   return r >= BigNumber.ZERO ? r : b1 + r;
 }
 
+String padh(BigNumber n, int pad) => n.toHexString().substring(2).padLeft(pad, '0');
 BigNumber b2n(Uint8List b) => BigNumber.from('0x${convert.hex.encode(b)}'); // bytes to number
 BigNumber slcNum(Uint8List b, int from, int to) => b2n(b.sublist(from, to)); // slice bytes num
-dynamic inv(BigNumber n, [BigNumber? md]) {
+List<int> n2b(BigNumber n) {
+  if (n < BigNumber.ZERO || n >= B256) {
+    err('bignumber out of range');
+  }
+
+  return convert.hex.decode(padh(n, 2 * fLen));
+}
+
+String n2h(BigNumber n) => convert.hex.encode(n2b(n));
+BigNumber inv(BigNumber n, [BigNumber? md]) {
   // modular inversion
   var md1 = P;
   if (md != null) {
@@ -68,10 +74,14 @@ dynamic inv(BigNumber n, [BigNumber? md]) {
     u = m;
     v = n;
   }
-  return b == BigNumber.ONE ? mod(x, md1) : err('no inverse'); // b is gcd at this point
+
+  if (b != BigNumber.ONE) {
+    err('no inverse');
+  }
+  return mod(x, md1); // b is gcd at this point
 }
 
-dynamic sqrt(BigNumber n) {
+BigNumber sqrt(BigNumber n) {
   // √n = n^((p+1)/4) for fields p = 3 mod 4
   // So, a special, fast case. Paper: "Square Roots from 1;24,51,10 to Dan Shanks".
   var r = BigNumber.ONE;
@@ -83,15 +93,17 @@ dynamic sqrt(BigNumber n) {
     i = (i * i) % P; // Not constant-time.
   }
 
-  if (mod(r * r) == n) {
-    return r;
+  if (mod(r * r) != n) {
+    err('sqrt invalid'); // check if result is valid
   }
-
-  err('sqrt invalid'); // check if result is valid
+  return r;
 }
 
-dynamic toPriv(BigNumber p) {
-  return ge(p) ? p : err('private key out of range'); // check if bigint is in range
+BigNumber toPriv(BigNumber p) {
+  if (!ge(p)) {
+    err('private key out of range');
+  }
+  return p; // check if bigint is in range
 }
 
 const W = 8; // Precomputes-related code. W = window size
@@ -173,6 +185,14 @@ class Point {
 
   Point(this.px, this.py, this.pz); // 3d less function
 
+  get x {
+    return aff().x;
+  } // .x, .y will call expensive toAffine:
+
+  get y {
+    return aff().y;
+  }
+
   bool equals(Point other) {
     // Equality check: compare points
     var X1 = px;
@@ -193,15 +213,6 @@ class Point {
   negate() {
     return Point(px, mod(py * BigNumber.NEGATIVE_ONE), pz);
   } // Flip point over y coord
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-
-    if (other.runtimeType != runtimeType) return false;
-
-    return equals(other as Point);
-  }
 
   @override
   int get hashCode => _hex.hashCode;
@@ -259,7 +270,7 @@ class Point {
     return Point(X3, Y3, Z3);
   }
 
-  mul(BigNumber n, [bool safe = true]) {
+  Point mul(BigNumber n, [bool safe = true]) {
     if (!safe && n.isZero()) {
       return ZERO; // in unsafe mode, allow zero
     }
@@ -267,7 +278,7 @@ class Point {
       err('invalid scalar'); // must be 0 < n < CURVE.n
     }
     if (equals(BASE)) {
-      return wNAF(n)['p']; // use precomputes for base point
+      return wNAF(n)['p'] ?? ZERO; // use precomputes for base point
     }
     var p = I, f = G; // init result point & fake point
     for (var d = this; n > BigNumber.ZERO; d = d.double(), n = n.shr(1)) {
@@ -283,7 +294,7 @@ class Point {
 
   static Point fromAffine(AffinePoint p) => Point(p.x, p.y, BigNumber.ONE);
 
-  static dynamic fromHex(String hex) {
+  static Point fromHex(String hex) {
     // Convert Uint8List or hex string to Point
     Uint8List hexBytes = Uint8List.fromList(convert.hex.decode(hex)); // convert hex string to Uint8Array
     Point p = ZERO;
@@ -308,14 +319,18 @@ class Point {
     if (len == 65 && head == 0x04) {
       p = Point(x, slcNum(tail, fLen, 2 * fLen), BigNumber.ONE);
     }
-    return !p.equals(ZERO) ? p.ok() : err('Point is not on curve'); // Verify the result
+    // Verify the result
+    if (p.equals(ZERO)) {
+      err('Point is not on curve');
+    }
+    return p.ok();
   }
 
-  static fromPrivateKey(String k) {
-    if (!k.startsWith('0x')) {
-      k = '0x$k';
+  static fromPrivateKey(String pk) {
+    if (!pk.startsWith('0x')) {
+      pk = '0x$pk';
     }
-    return BASE.mul(toPriv(BigNumber.from(k)));
+    return BASE.mul(toPriv(BigNumber.from(pk)));
   } // Create point from a private key.
 
   AffinePoint toAffine() {
@@ -336,45 +351,71 @@ class Point {
     return AffinePoint(mod(px * iz), mod(py * iz)); // x = x*z^-1; y = y*z^-1
   }
 
-  dynamic toHex(bool isCompressed) {
-    // Encode point to hex string.
-    var affPoint = aff(); // convert to 2d xy affine point
-    if (affPoint is AffinePoint) {
-      String head = isCompressed ? ((affPoint.y & BigNumber.ONE).isZero() ? '02' : '03') : '04'; // 0x02, 0x03, 0x04 prefix
-
-      String xHex = affPoint.x.toHexString().substring(2);
-      String yHex = affPoint.y.toHexString().substring(2);
-      return '$head$xHex${isCompressed ? '' : yHex}';
-    }
-  }
-
-  dynamic assertValidity() {
+  Point assertValidity() {
     // Checks if the point is valid and on-curve
     var affPoint = aff(); // convert to 2d xy affine point.
-    if (affPoint is! AffinePoint || !fe(affPoint.x) || !fe(affPoint.y)) {
+    if (!fe(affPoint.x) || !fe(affPoint.y)) {
       err('Point invalid: x or y');
     } // x and y must be in range 0 < n < P
-    return mod(affPoint.y.mul(affPoint.y)) == crv(affPoint.x)
-        ? // y² = x³ + ax + b, must be equal
-        this
-        : err('Point invalid: not on curve');
+
+    // y² = x³ + ax + b, must be equal
+    if (mod(affPoint.y.mul(affPoint.y)) != crv(affPoint.x)) {
+      err('Point invalid: not on curve');
+    }
+    return this;
   }
 
+  // Aliases to compress code
   Point multiply(BigNumber n) {
     return mul(n);
   }
 
-  // multiply(n: bigint) { return this.mul(n); }           // Aliases to compress code
-  dynamic ok() {
+  Point ok() {
     return assertValidity();
   }
 
-  aff() {
+  AffinePoint aff() {
     return toAffine();
+  }
+
+  String toHex([bool isCompressed = true]) {
+    // Encode point to hex string.
+    var affPoint = aff(); // convert to 2d xy affine point
+    String head = isCompressed ? ((affPoint.y & BigNumber.ONE).isZero() ? '02' : '03') : '04'; // 0x02, 0x03, 0x04 prefix
+
+    String xHex = n2h(affPoint.x);
+    String yHex = n2h(affPoint.y);
+    var result = '$head$xHex${isCompressed ? '' : yHex}';
+    return result;
+  }
+
+  Uint8List toRawBytes([bool isCompressed = true]) {
+    String hex = toHex(isCompressed);
+    return Uint8List.fromList(convert.hex.decode(hex));
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+
+    if (other.runtimeType != runtimeType) return false;
+
+    return equals(other as Point);
   }
 
   @override
   String toString() {
     return 'Point {\n  px: $px,\n  py: $py,\n  pz: $pz\n}';
   }
+}
+
+String getPublicKey(String privKey, [bool isCompressed = true]) {
+  if (privKey.length != fLen * 2) {
+    err('Invalid public key');
+  }
+  // Make public key from priv
+  Point point = Point.fromPrivateKey(privKey);
+  var bytes = point.toRawBytes(isCompressed);
+  var result = convert.hex.encode(bytes); // 33b or 65b output
+  return result;
 }
