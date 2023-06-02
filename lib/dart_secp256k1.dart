@@ -419,3 +419,11 @@ String getPublicKey(String privKey, [bool isCompressed = true]) {
   var result = convert.hex.encode(bytes); // 33b or 65b output
   return result;
 }
+
+
+Uint8List hashToPrivateKey(String hash) {           // FIPS 186 B.4.1 compliant key generation
+  const minLen = fLen + 8;                              // being neglible.
+  if (hash.length < minLen || hash.length > 1024) err('expected proper params');
+  BigNumber n = mod(b2n(Uint8List.fromList(hash.codeUnits)), N - BigNumber.ONE) + BigNumber.ONE;              // takes at least n+8 bytes
+  return Uint8List.fromList(convert.hex.decode(n.toHexString()));
+}

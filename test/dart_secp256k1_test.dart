@@ -6,6 +6,7 @@ import 'dart:math' as math;
 
 import 'package:dart_bignumber/dart_bignumber.dart';
 import 'package:dart_secp256k1/dart_secp256k1.dart';
+import 'package:dart_secp256k1/utils.dart' as utils;
 import 'package:test/test.dart';
 
 void main() {
@@ -18,21 +19,7 @@ void main() {
 
   String toBEHex(BigNumber n) => n.toHexString().replaceAll('0x', '').padLeft(64, '0');
 
-  math.Random random = math.Random();
-  String randomHexString(int length) {
-    StringBuffer sb = StringBuffer();
-    for (var i = 0; i < length; i++) {
-      sb.write(random.nextInt(16).toRadixString(16));
-    }
-    return sb.toString();
-  }
-
-  List<String> INVALID_ITEMS = [
-    'deadbeef',
-    math.pow(2, 53).toString(),
-    'xyzxyzxyxyzxyzxyxyzxyzxyxyzxyzxyxyzxyzxyxyzxyzxyxyzxyzxyxyzxyzxy',
-    (CURVE['n']! + BigNumber.TWO).toHexString()
-  ];
+  List<String> INVALID_ITEMS = ['deadbeef', math.pow(2, 53).toString(), 'xyzxyzxyxyzxyzxyxyzxyzxyxyzxyzxyxyzxyzxyxyzxyzxyxyzxyzxyxyzxyzxy', (CURVE['n']! + BigNumber.TWO).toHexString()];
 
   group('SECP256K1', () {
     test('getPublicKey()', () {
@@ -46,8 +33,8 @@ void main() {
           expect(toBEHex(point.x), x);
           expect(toBEHex(point.y), y);
 
-          String publicKey2 = getPublicKey(toBEHex(bn));
-          Point point2 = Point.fromHex(publicKey2);
+          String publicKey = getPublicKey(toBEHex(bn));
+          Point point2 = Point.fromHex(publicKey);
           expect(toBEHex(point2.x), x);
           expect(toBEHex(point2.y), y);
         }
@@ -58,26 +45,24 @@ void main() {
         expect(() => getPublicKey(item), throwsException);
       }
     });
-    // should('precompute', () => {
-    //   secp.utils.precompute(4);
-    //   const data = privatesTxt
-    //     .split('\n')
-    //     .filter((line) => line)
-    //     .map((line) => line.split(':'));
-    //   for (let [priv, x, y] of data) {
-    //     const point = Point.fromPrivateKey(BigInt(priv));
-    //     deepStrictEqual(toBEHex(point.x), x);
-    //     deepStrictEqual(toBEHex(point.y), y);
+    test('precompute', () {
+      utils.precompute(4);
+      var data = privatesTxt.split('\n').map((line) => line.split(':'));
+      for (var p in data) {
+        if (p.length == 3) {
+          var priv = p[0], x = p[1], y = p[2];
+          var bn = BigNumber.from(priv);
 
-    //     const point2 = Point.fromHex(secp.getPublicKey(toBEHex(BigInt(priv))));
-    //     deepStrictEqual(toBEHex(point2.x), x);
-    //     deepStrictEqual(toBEHex(point2.y), y);
+          var point = Point.fromPrivateKey(bn.toHexString());
+          expect(toBEHex(point.x), x);
+          expect(toBEHex(point.y), y);
 
-    //     const point3 = Point.fromHex(secp.getPublicKey(hexToBytes(toBEHex(BigInt(priv)))));
-    //     deepStrictEqual(toBEHex(point3.x), x);
-    //     deepStrictEqual(toBEHex(point3.y), y);
-    //   }
-    // });
+          var point2 = Point.fromHex(getPublicKey(toBEHex(bn)));
+          expect(toBEHex(point2.x), x);
+          expect(toBEHex(point2.y), y);
+        }
+      }
+    });
 
     group('Point', () {
       test('fromHex() assertValidity', () async {
@@ -118,7 +103,7 @@ void main() {
 
       test('#toHex() roundtrip', () {
         // randomize a point
-        Point point = Point.fromPrivateKey('0x${randomHexString(64)}');
+        Point point = Point.fromPrivateKey('0x${utils.randomHexString(64)}');
         var hex = point.toHex(true);
         expect(Point.fromHex(hex).toHex(true), hex);
       });
@@ -166,6 +151,26 @@ void main() {
           expect(() => Point.BASE.multiply(BigNumber.from(n)), throwsException);
         }
       });
+    });
+
+    group('Signature', () {
+    //   should('.fromCompactHex() roundtrip', () => {
+    //   fc.assert(
+    //     fc.property(FC_BIGINT, FC_BIGINT, (r, s) => {
+    //       const sig = new secp.Signature(r, s);
+    //       deepStrictEqual(secp.Signature.fromCompact(sig.toCompactHex()), sig);
+    //     })
+    //   );
+    // });
+
+    // should('.fromDERHex() roundtrip', () => {
+    //   fc.assert(
+    //     fc.property(FC_BIGINT, FC_BIGINT, (r, s) => {
+    //       const sig = new secp.Signature(r, s);
+    //       deepStrictEqual(sigFromDER(sigToDER(sig)), sig);
+    //     })
+    //   );
+    // });
     });
   });
 }
