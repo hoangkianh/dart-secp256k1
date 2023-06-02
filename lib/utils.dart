@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:dart_bignumber/dart_bignumber.dart';
 import 'package:dart_secp256k1/dart_secp256k1.dart';
+import 'package:dart_secp256k1/point.dart';
 
 bool isValidPrivateKey(String key) {
   try {
