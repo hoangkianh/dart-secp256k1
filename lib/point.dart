@@ -1,16 +1,16 @@
 // ignore_for_file: non_constant_identifier_names
 
 import 'dart:typed_data';
-import "dart:math" as math;
+import 'dart:math' as math;
 import 'package:convert/convert.dart' as convert;
 
 import 'package:dart_bignumber/dart_bignumber.dart';
 
-import 'dart_secp256k1.dart';
+import 'main.dart';
 
 class AffinePoint {
-  BigNumber x;
-  BigNumber y;
+  final BigNumber x;
+  final BigNumber y;
 
   AffinePoint(this.x, this.y);
 } // Point in 2d xy affine coordinates
@@ -53,9 +53,6 @@ class Point {
   negate() {
     return Point(px, mod(py * BigNumber.NEGATIVE_ONE), pz);
   } // Flip point over y coord
-
-  @override
-  int get hashCode => _hex.hashCode;
 
   double() {
     return add(this);
@@ -130,6 +127,11 @@ class Point {
       }
     }
     return p;
+  }
+
+  Point mulAddQUns(Point R, BigNumber u1, BigNumber u2) {
+    // Double scalar mult. Q = u1⋅G + u2⋅R.
+    return mul(u1, false).add(R.mul(u2, false)).ok(); // Unsafe: do NOT use for stuff related
   }
 
   static Point fromAffine(AffinePoint p) => Point(p.x, p.y, BigNumber.ONE);
@@ -235,6 +237,9 @@ class Point {
   }
 
   @override
+  int get hashCode => _hex.hashCode;
+
+  @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
 
@@ -310,7 +315,6 @@ Map<String, Point> wNAF(BigNumber n) {
   }
   return {'p': p, 'f': f}; // return both real and fake points for JIT
 } // !! you can disable precomputes by commenting-out call of the wNAF() inside Point#mul()
-
 
 String getPublicKey(String privKey, [bool isCompressed = true]) {
   if (privKey.length != fLen * 2) {

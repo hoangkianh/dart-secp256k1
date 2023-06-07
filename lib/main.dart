@@ -104,7 +104,6 @@ BigNumber toPriv(BigNumber p) {
   }
   return p; // check if bigint is in range
 }
-
 Uint8List hashToPrivateKey(String hash) {           // FIPS 186 B.4.1 compliant key generation
   const minLen = fLen + 8;                              // being neglible.
   if (hash.length < minLen || hash.length > 1024) err('expected proper params');

@@ -3,12 +3,14 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
+import 'package:dart_secp256k1/helpers.dart';
+import 'package:dart_secp256k1/signature.dart';
+import 'package:test/test.dart';
 
 import 'package:dart_bignumber/dart_bignumber.dart';
-import 'package:dart_secp256k1/dart_secp256k1.dart';
+import 'package:dart_secp256k1/main.dart';
 import 'package:dart_secp256k1/point.dart';
 import 'package:dart_secp256k1/utils.dart' as utils;
-import 'package:test/test.dart';
 
 void main() {
   final file = File('test/vectors/points.json');
@@ -155,23 +157,17 @@ void main() {
     });
 
     group('Signature', () {
-    //   should('.fromCompactHex() roundtrip', () => {
-    //   fc.assert(
-    //     fc.property(FC_BIGINT, FC_BIGINT, (r, s) => {
-    //       const sig = new secp.Signature(r, s);
-    //       deepStrictEqual(secp.Signature.fromCompact(sig.toCompactHex()), sig);
-    //     })
-    //   );
-    // });
+      test('.fromCompactHex() roundtrip', () {
+        Point point = Point.fromPrivateKey('0x${utils.randomHexString(64)}');
+        Signature sig = Signature(point.px, point.py);
+        expect(Signature.fromCompact(sig.toCompactHex()), sig);
+      });
 
-    // should('.fromDERHex() roundtrip', () => {
-    //   fc.assert(
-    //     fc.property(FC_BIGINT, FC_BIGINT, (r, s) => {
-    //       const sig = new secp.Signature(r, s);
-    //       deepStrictEqual(sigFromDER(sigToDER(sig)), sig);
-    //     })
-    //   );
-    // });
+      test('.fromDERHex() roundtrip', () {
+        Point point = Point.fromPrivateKey('0x${utils.randomHexString(64)}');
+        Signature sig = Signature(point.px, point.py);
+        expect(sigFromDER(sigToDER(sig)), sig);
+      });
     });
   });
 }
