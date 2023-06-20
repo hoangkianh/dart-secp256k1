@@ -51,7 +51,7 @@ class Point {
   }
 
   negate() {
-    return Point(px, mod(py * BigNumber.NEGATIVE_ONE), pz);
+    return Point(px, mod(-py), pz);
   } // Flip point over y coord
 
   double() {
@@ -154,7 +154,7 @@ class Point {
       var isYOdd = (y & (BigNumber.ONE)) == BigNumber.ONE; // y² is equivalent left-side. Calculate y²:
       var headOdd = (head & 1) == 1; // y = √y²; there are two solutions: y, -y
       if (headOdd != isYOdd) {
-        y = mod(y.mul(BigNumber.NEGATIVE_ONE));
+        y = mod(-y);
       } // determine proper solution
       p = Point(x, y, BigNumber.ONE); // create point
     } // Uncompressed points: 65b, start with 0x04

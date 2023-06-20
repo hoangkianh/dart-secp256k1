@@ -17,6 +17,12 @@ bool isValidPrivateKey(String key) {
 
 math.Random random = math.Random();
 
+List<int> randomBytes(int length) {
+  final random = math.Random.secure();
+  final bytes = List<int>.generate(length, (_) => random.nextInt(256));
+  return bytes;
+}
+
 String randomHexString(int length) {
   StringBuffer sb = StringBuffer();
   for (var i = 0; i < length; i++) {

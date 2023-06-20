@@ -31,6 +31,9 @@ BigNumber mod(BigNumber a, [BigNumber? b]) {
   var r = a % b1;
   return r >= BigNumber.ZERO ? r : b1 + r;
 }
+Uint8List toU8(String a) {
+  return Uint8List.fromList(convert.hex.decode(a));
+}
 
 String padh(BigNumber n, int pad) => n.toHexString().substring(2).padLeft(pad, '0');
 BigNumber b2n(Uint8List b) => BigNumber.from('0x${convert.hex.encode(b)}'); // bytes to number
@@ -40,10 +43,22 @@ List<int> n2b(BigNumber n) {
     err('bignumber out of range');
   }
 
-  return convert.hex.decode(padh(n, 2 * fLen));
+  return toU8(padh(n, 2 * fLen));
 }
 
 String n2h(BigNumber n) => convert.hex.encode(n2b(n));
+Uint8List concatB(List<Uint8List> arrs) {
+  final totalLength = arrs.fold<int>(0, (sum, a) => sum + a.length);
+  final result = Uint8List(totalLength);
+  var offset = 0;
+
+  for (var arr in arrs) {
+    result.setRange(offset, offset + arr.length, arr);
+    offset += arr.length;
+  }
+
+  return result;
+}
 BigNumber inv(BigNumber n, [BigNumber? md]) {
   // modular inversion
   var md1 = P;
