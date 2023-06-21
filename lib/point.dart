@@ -317,8 +317,8 @@ Map<String, Point> wNAF(BigNumber n) {
 } // !! you can disable precomputes by commenting-out call of the wNAF() inside Point#mul()
 
 String getPublicKey(String privKey, [bool isCompressed = true]) {
-  if (privKey.length != fLen * 2) {
-    err('Invalid public key');
+  if (privKey.length < 2 * fLen) {
+    privKey = padh(BigNumber.from(privKey), 2 * fLen);
   }
   // Make public key from priv
   Point point = Point.fromPrivateKey(privKey);

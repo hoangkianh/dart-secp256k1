@@ -235,3 +235,43 @@ Signature sign(String msgh, String priv, {Map<String, dynamic>? opts = const {'l
   final k2sig = bc.k2sig;
   return hmacDrbg<Signature>(false)(seed, k2sig);
 }
+
+bool verify(Signature sig, String msgh, String pub, {Map<String, dynamic>? opts = const {'lowS': true}}) {
+  opts ?? optV;
+  bool lowS = opts!['lowS'];
+
+  if (opts.containsKey('strict')) err('verify() legacy options not supported');
+
+  Signature sig_;
+  BigNumber h;
+  Point P;
+
+  try {
+    sig_ = sig;
+    h = bits2BigNumber_modN(toU8(msgh));
+    P = Point.fromHex(pub);
+  } catch (e) {
+    return false;
+  }
+
+  BigNumber r = sig_.r;
+  BigNumber s = sig_.s;
+
+  if (lowS && moreThanHalfN(s)) {
+    return false;
+  }
+
+  AffinePoint R;
+  try {
+    BigNumber is_ = inv(s, N); // s^-1
+    BigNumber u1 = mod(h * is_, N); // u1 = hs^-1 mod n
+    BigNumber u2 = mod(r * is_, N); // u2 = rs^-1 mod n
+    R = G.mulAddQUns(P, u1, u2).aff(); // R = u1⋅G + u2⋅P
+  } catch (e) {
+    return false;
+  }
+
+  if (R.x.isZero() && R.y.isZero()) return false; // stop if R is identity / zero point
+  BigNumber v = mod(R.x, N);  // <== The weird ECDSA part. R.x must be in N's field, not P's
+  return v == r; // mod(R.x, n) == r
+}
