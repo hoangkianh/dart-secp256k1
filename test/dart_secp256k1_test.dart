@@ -3,7 +3,6 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
-import 'package:convert/convert.dart';
 import 'package:dart_secp256k1/helpers.dart';
 import 'package:dart_secp256k1/signature.dart';
 import 'package:test/test.dart';
@@ -221,8 +220,7 @@ void main() {
             opts: {'extraEntropy': null},
           );
 
-          // expect(sigToDER(res), exp);
-          var a = sigFromDER(sigToDER(res));
+          expect(sigToDER(res), exp);
           final rs = sigFromDER(sigToDER(res)).toCompactHex();
           expect(sigToDER(Signature.fromCompact(rs)), exp);
         }
