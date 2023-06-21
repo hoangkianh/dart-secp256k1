@@ -119,9 +119,11 @@ BigNumber toPriv(BigNumber p) {
   }
   return p; // check if bigint is in range
 }
-Uint8List hashToPrivateKey(String hash) {           // FIPS 186 B.4.1 compliant key generation
-  const minLen = fLen + 8;                              // being neglible.
+
+Uint8List hashToPrivateKey(String hash) {
+  // FIPS 186 B.4.1 compliant key generation
+  const minLen = fLen + 8; // being neglible.
   if (hash.length < minLen || hash.length > 1024) err('expected proper params');
-  BigNumber n = mod(b2n(Uint8List.fromList(hash.codeUnits)), N - BigNumber.ONE) + BigNumber.ONE;              // takes at least n+8 bytes
+  BigNumber n = mod(b2n(Uint8List.fromList(hash.codeUnits)), N - BigNumber.ONE) + BigNumber.ONE; // takes at least n+8 bytes
   return Uint8List.fromList(convert.hex.decode(n.toHexString()));
 }

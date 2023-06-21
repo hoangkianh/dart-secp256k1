@@ -10,6 +10,11 @@ class ParseResult {
   Uint8List l;
 
   ParseResult(this.d, this.l);
+
+  @override
+  String toString() {
+    return 'ParseResult: \n{ \n  d: $d; \n  l: $l \n}';
+  }
 }
 
 class DER {
@@ -29,7 +34,6 @@ class DER {
   }
 
   static Signature toSig(String hex) {
-    // if (!())
     var data = convert.hex.decode(hex);
     var l = data.length;
     if (l < 2 || data[0] != 0x30) throw Exception('ui8a expected');
@@ -54,12 +58,12 @@ class DER {
     }
 
     String h(n) {
-      String hex = n.toRadixString(16);
+      String hex = n is BigNumber ? n.toHexString().substring(2) : n.toRadixString(16);
       return (hex.length.isOdd) ? '0$hex' : hex;
     }
 
-    String s = slice(sig.s.toHexString().substring(2));
-    String r = slice(sig.r.toHexString().substring(2));
+    String r = slice(h(sig.r));
+    String s = slice(h(sig.s));
     int shl = s.length ~/ 2;
     int rhl = r.length ~/ 2;
     String sl = h(shl);
@@ -68,11 +72,9 @@ class DER {
   }
 }
 
-Signature sigFromDER(dynamic der) {
+Signature sigFromDER(String der) {
   final sig = DER.toSig(der);
-  BigNumber r = sig.r;
-  var s = sig.s;
-  return Signature(r, s);
+  return Signature(sig.r, sig.s);
 }
 
-sigToDER(Signature sig) => DER.hexFromSig(sig);
+String sigToDER(Signature sig) => DER.hexFromSig(sig);
