@@ -236,7 +236,7 @@ Signature sign(String msgh, String priv, {Map<String, dynamic>? opts = const {'l
   return hmacDrbg<Signature>(false)(seed, k2sig);
 }
 
-bool verify(Signature sig, String msgh, String pub, {Map<String, dynamic>? opts = const {'lowS': true}}) {
+bool verify(String sig, String msgh, String pub, {Map<String, dynamic>? opts = const {'lowS': true}}) {
   opts ?? optV;
   bool lowS = opts!['lowS'];
 
@@ -247,7 +247,7 @@ bool verify(Signature sig, String msgh, String pub, {Map<String, dynamic>? opts 
   Point P;
 
   try {
-    sig_ = sig;
+    sig_ = Signature.fromCompact(sig);
     h = bits2BigNumber_modN(toU8(msgh));
     P = Point.fromHex(pub);
   } catch (e) {
@@ -268,6 +268,7 @@ bool verify(Signature sig, String msgh, String pub, {Map<String, dynamic>? opts 
     BigNumber u2 = mod(r * is_, N); // u2 = rs^-1 mod n
     R = G.mulAddQUns(P, u1, u2).aff(); // R = u1⋅G + u2⋅P
   } catch (e) {
+    print(e);
     return false;
   }
 

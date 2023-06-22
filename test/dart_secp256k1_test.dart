@@ -236,7 +236,7 @@ void main() {
         final signature = sign(MSG, PRIV_KEY.toHexString());
         final publicKey = getPublicKey(PRIV_KEY.toHexString());
         expect(publicKey.length, 66);
-        expect(verify(signature, MSG, publicKey), true);
+        expect(verify(signature.toCompactHex(), MSG, publicKey), true);
       });
 
       test('not verify signature with wrong public key', () {
@@ -246,7 +246,7 @@ void main() {
         final signature = sign(MSG, PRIV_KEY);
         final publicKey = Point.fromPrivateKey(WRONG_PRIV_KEY).toHex();
         expect(publicKey.length, 66);
-        expect(verify(signature, MSG, publicKey), false);
+        expect(verify(signature.toCompactHex(), MSG, publicKey), false);
       });
 
       test('not verify signature with wrong hash', () {
@@ -256,7 +256,7 @@ void main() {
         final signature = sign(MSG, PRIV_KEY.toHexString());
         final publicKey = getPublicKey(PRIV_KEY.toHexString());
         expect(publicKey.length, 66);
-        expect(verify(signature, WRONG_MSG, publicKey), false);
+        expect(verify(signature.toCompactHex(), WRONG_MSG, publicKey), false);
       });
 
       test('verify random signatures', () {
@@ -265,7 +265,7 @@ void main() {
         final pub = getPublicKey(privKey);
         final sig = sign(msg, privKey);
 
-        expect(verify(sig, msg, pub), true);
+        expect(verify(sig.toCompactHex(), msg, pub), true);
       });
 
       test('not verify signature with invalid r/s', () {
@@ -308,7 +308,34 @@ void main() {
         final r = BigNumber.ONE;
         final s = BigNumber.from('115792089237316195423570985008687907852837564279074904382605163141518162728904');
         final pub = Point(x, y, BigNumber.ONE).toRawBytes();
-        expect(() => verify(Signature(r, s), convert.hex.encode(msg), convert.hex.encode(pub)), throwsException);
+        expect(() => verify(Signature(r, s).toCompactHex(), convert.hex.encode(msg), convert.hex.encode(pub)), throwsException);
+      });
+
+      test('not verify msg = curve order', () {
+        final msg = 'fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141';
+        final x = BigNumber.from('55066263022277343669578718895168534326250603453777594175500187360389116729240');
+        final y = BigNumber.from('32670510020758816978083085130507043184471273380659243275938904335757337482424');
+        final r = BigNumber.from('104546003225722045112039007203142344920046999340768276760147352389092131869133');
+        final s = BigNumber.from('96900796730960181123786672629079577025401317267213807243199432755332205217369');
+        final pub = Point(x, y, BigNumber.ONE).toRawBytes();
+        expect(verify(Signature(r, s).toCompactHex(), msg, convert.hex.encode(pub)), false);
+      });
+
+      test('verify non-strict msg bb5a...', () {
+        final msg = 'bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca605023';
+        final x = BigNumber.from('3252872872578928810725465493269682203671229454553002637820453004368632726370');
+        final y = BigNumber.from('17482644437196207387910659778872952193236850502325156318830589868678978890912');
+        final r = BigNumber.from('432420386565659656852420866390673177323');
+        final s = BigNumber.from('115792089237316195423570985008687907852837564279074904382605163141518161494334');
+        final pub = Point(x, y, BigNumber.ONE).toRawBytes();
+        expect(verify(Signature(r, s).toCompactHex(), msg, convert.hex.encode(pub), opts: {'lowS': false}), true);
+      });
+
+      test('not verify invalid deterministic signatures with RFC 6979', () {
+        for (final vector in ecdsa['invalid']['verify']) {
+          var res = verify(vector['signature'], vector['m'], vector['Q']);
+          expect(res, false);
+        }
       });
     });
   });
